@@ -3,16 +3,18 @@ package com.ravi.spynedemo
 import android.annotation.SuppressLint
 import android.content.Context
 import android.content.Intent
-import android.util.Log
+import android.os.Build
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
 import android.widget.ImageView
 import android.widget.TextView
+import androidx.annotation.RequiresApi
 import androidx.recyclerview.widget.RecyclerView
 import com.bumptech.glide.Glide
 import com.bumptech.glide.request.RequestOptions.centerCropTransform
 import com.ravi.spynedemo.model.GIFData
+import java.util.stream.Collectors
 
 class GifRvAdapter : RecyclerView.Adapter<GifRvAdapter.ViewHolder>() {
 
@@ -35,8 +37,10 @@ class GifRvAdapter : RecyclerView.Adapter<GifRvAdapter.ViewHolder>() {
         return gifList.size
     }
 
-    fun setData(gifAry: List<GIFData>, isInit:Boolean) {
-        if(isInit) gifList = gifAry as MutableList<GIFData> else  gifList.addAll(gifAry)
+    fun setData(gifAry: List<GIFData>) {
+        gifList.addAll(gifAry)
+        gifList = gifList.distinctBy { it.id } as MutableList
+
         notifyDataSetChanged()
     }
 

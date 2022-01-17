@@ -5,6 +5,8 @@ import android.content.Context
 import android.content.res.Configuration
 import android.os.Build
 import android.os.Bundle
+import android.os.Handler
+import android.os.Looper
 import android.util.Log
 import android.view.Menu
 import android.view.MenuItem
@@ -26,6 +28,8 @@ import com.ravi.spynedemo.util.observeOnce
 import dagger.hilt.android.AndroidEntryPoint
 import kotlinx.coroutines.flow.collect
 import kotlinx.coroutines.launch
+import java.util.*
+import kotlin.concurrent.timerTask
 
 @AndroidEntryPoint
 class MainActivity : AppCompatActivity() {
@@ -36,6 +40,8 @@ class MainActivity : AppCompatActivity() {
     private var pageNum = 1
     var page = -1
     var isLoad = false
+    var count = 0
+
     private val adapter: GifRvAdapter by lazy { GifRvAdapter() }
 
     @RequiresApi(Build.VERSION_CODES.N)
@@ -55,7 +61,7 @@ class MainActivity : AppCompatActivity() {
                 readDatabase()
             }
         }
-        getGifs(false)
+        addGifDataObserver()
     }
 
     private fun readDatabase() {
@@ -63,9 +69,9 @@ class MainActivity : AppCompatActivity() {
             mainViewModel.readGifs.observeOnce(this@MainActivity, { database ->
                 if (database.isNotEmpty()) {
                     Log.d("RecipesFragment", "readDatabase called!")
-                    adapter?.setData(database.first().gifs.data, true)
+                    adapter.setData(database.first().gifs.data)
                 } else {
-                    getGifs(false)
+                    getGifs()
                 }
             })
         }
@@ -120,8 +126,11 @@ class MainActivity : AppCompatActivity() {
         binding.rvGif.addOnScrollListener(object : PaginationScrollListener(layoutManager) {
             override fun loadMoreItems() {
                 this@MainActivity.isLoad = true
-                pageNum += 1;
-                getGifs(true)
+                pageNum += 1
+                if(pageNum<=20){
+                    getGifs()
+                }
+
             }
 
             override val isLastPage: Boolean
@@ -132,66 +141,73 @@ class MainActivity : AppCompatActivity() {
         })
     }
 
-    private fun getGifs(loadMore: Boolean) {
-
+    private fun getGifs() {
         mainViewModel.getGifData(pageNum)
+
+
+    }
+    private fun addGifDataObserver(){
         mainViewModel.gifData.observe(this, { response ->
-            when (response) {
-                is NetworkResult.Success -> {
+            response?.let {
+                count++
 
-                    response.data?.let {
 
-                        isLoad = false
-                        showLoader(false)
+                when (it) {
 
-                        if (loadMore) {
-                            adapter.setData(it, false)
-                        } else {
-                            adapter.setData(it, true)
+                    is NetworkResult.Success -> {
+                        response.data?.let {
+                            isLoad = false
+                            showLoader(false)
+                            adapter.setData(it)
                         }
                     }
-                }
-                is NetworkResult.Error -> {
-                    showLoader(false)
-                    isLoad = false
-                    Toast.makeText(
-                        this,
-                        response.message.toString(),
-                        Toast.LENGTH_SHORT
-                    ).show()
-                }
-                is NetworkResult.Loading -> {
-                    showLoader(true)
-                    isLoad = true
+                    is NetworkResult.Error -> {
+                        showLoader(false)
+                        isLoad = false
+                        Toast.makeText(
+                            this,
+                            response.message.toString(),
+                            Toast.LENGTH_SHORT
+                        ).show()
+                    }
+                    is NetworkResult.Loading -> {
+                        showLoader(true)
+                        isLoad = true
+                    }
                 }
             }
+
+        })
+        mainViewModel.gifSearchedData.observe(this, { response ->
+            response.let {
+                when (response) {
+                    is NetworkResult.Success -> {
+                        response.data?.let {
+                            initRecyclerView()
+                        }
+                    }
+                    is NetworkResult.Error -> {
+                        showLoader(false)
+                        isLoad = false
+                        Toast.makeText(
+                            this,
+                            response.message.toString(),
+                            Toast.LENGTH_SHORT
+                        ).show()
+                    }
+                    is NetworkResult.Loading -> {
+                        showLoader(true)
+                        isLoad = true
+                    }
+                }
+            }
+
         })
     }
 
     private fun getSearchVideoCategories(query: String) {
         mainViewModel.getSearchedGifData(query)
-        mainViewModel.gifSearchedData.observe(this, { response ->
-            when (response) {
-                is NetworkResult.Success -> {
-                    response.data?.let {
-                        initRecyclerView()
-                    }
-                }
-                is NetworkResult.Error -> {
-                    showLoader(false)
-                    isLoad = false
-                    Toast.makeText(
-                        this,
-                        response.message.toString(),
-                        Toast.LENGTH_SHORT
-                    ).show()
-                }
-                is NetworkResult.Loading -> {
-                    showLoader(true)
-                    isLoad = true
-                }
-            }
-        })
+
     }
 
     private fun showLoader(show: Boolean) {
